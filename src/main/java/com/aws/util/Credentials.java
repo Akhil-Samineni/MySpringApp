@@ -6,9 +6,9 @@ package com.aws.util;
  */
 public class Credentials {
 
-    public static final String access_key_id= "AKIA5XB5KVRW3LFBXLV7";
+    public static final String access_key_id= "AKIA5S4TWFG2MJLEZXXZ";
 
-    public static final String secret_access_key ="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";
+    public static final String secret_access_key ="Syug4lURBHIOKlDOAbDbmLNeZk1Q1lm9PjGp5mkb";
 
     public static final String region ="us-east-1";
 
