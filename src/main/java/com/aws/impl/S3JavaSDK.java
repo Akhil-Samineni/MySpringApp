@@ -14,11 +14,12 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.*;
 import com.aws.util.Credentials;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import sun.security.krb5.internal.crypto.dk.AesDkCrypto;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -46,32 +47,42 @@ public class S3JavaSDK {
         String newBucketName = "akhils3sdkbukcet";
         try {
             s3Client.createBucket(newBucketName);
-        ClassLoader classLoader = getClass().getClassLoader();
-        String policyFileName="encrypted-folder-policy";
-        File policyfile = new File(classLoader.getResource(policyFileName).getFile());
-        String path=policyfile.getPath();
-        String policy=new String(Files.readAllBytes(Paths.get(path)));
+            String policyFileName="encrypted-folder-policy";
+            File policyfile =readAndWriteToFile(policyFileName);
+            String path=policyfile.getPath();
+            String policy=new String(Files.readAllBytes(Paths.get(path)));
             policy=policy.replace("bucketname",newBucketName);
             s3Client.setBucketPolicy(newBucketName,policy);
 
-
-        final String fileName = "sometext.txt";
-        File file = new File(classLoader.getResource(fileName).getFile());
-
-        PutObjectRequest putRequest1 = new PutObjectRequest(newBucketName, "encrypted/" + fileName , file);
-       /* putRequest1.withCannedAcl(CannedAccessControlList.PublicRead);*/
-        ObjectMetadata objectMetadata=new ObjectMetadata();
-        objectMetadata.setSSEAlgorithm(ObjectMetadata.AES_256_SERVER_SIDE_ENCRYPTION);
-        putRequest1.setMetadata(objectMetadata);
-        PutObjectResult response1 = s3Client.putObject(putRequest1);
-        System.out.println("Uploaded object encryption status is " +
-                response1.getSSEAlgorithm());
+            final String fileName = "sometext.txt";
+            File someText1 =readAndWriteToFile(fileName);
+            PutObjectRequest putRequest1 = new PutObjectRequest(newBucketName, "encrypted/" + fileName , someText1);
+            ObjectMetadata objectMetadata=new ObjectMetadata();
+            objectMetadata.setSSEAlgorithm(ObjectMetadata.AES_256_SERVER_SIDE_ENCRYPTION);
+            putRequest1.setMetadata(objectMetadata);
+            PutObjectResult response1 = s3Client.putObject(putRequest1);
+            System.out.println("Uploaded object encryption status is " +
+                    response1.getSSEAlgorithm());
         }catch (Exception e){
             e.printStackTrace();
         }
 
     }
 
+    public File readAndWriteToFile(String fileName){
+        File file=null;
+        try {
+            ClassPathResource classPathResource = new ClassPathResource(fileName);
+            InputStream inputStream1 = classPathResource.getInputStream();
+            file = new File(fileName);
+            OutputStream outputStream1 = new FileOutputStream(file);
+            IOUtils.copy(inputStream1, outputStream1);
+        }catch (Exception e){
+            System.out.println("exception in readAndWriteToFile");
+            e.printStackTrace();
+        }
+        return file;
+    }
     public void deleteObjects(AmazonS3 s3Client, String bucket_name){
         ObjectListing object_listing = s3Client.listObjects(bucket_name);
         for (Iterator<?> iterator = object_listing.getObjectSummaries().iterator(); iterator.hasNext(); ) {
@@ -92,13 +103,10 @@ public class S3JavaSDK {
         String newBucketName = "akhils3transitsdkbukcet";
         try {
             s3Client.createBucket(newBucketName);
-            ClassLoader classLoader = getClass().getClassLoader();
-
             final String fileName = "sometext.txt";
-            File file = new File(classLoader.getResource(fileName).getFile());
+            File file = readAndWriteToFile(fileName);
             byte[] encryptedData= encryptDataUsingKMS(file);
             FileUtils.writeByteArrayToFile(new File(file.getPath()),encryptedData);
-            file = new File(classLoader.getResource(fileName).getFile());
             PutObjectRequest putRequest1 = new PutObjectRequest(newBucketName, fileName , file);
 
             PutObjectResult response1 = s3Client.putObject(putRequest1);
@@ -117,10 +125,10 @@ public class S3JavaSDK {
         final KmsMasterKeyProvider keyProvider = KmsMasterKeyProvider.builder().buildStrict(Credentials.keyArn);
         CryptoResult<byte[], KmsMasterKey> encryptResult=null;
         byte[] unencrypted;
-       final Map<String, String> encryptionContext = Collections.singletonMap("ExampleContextKey", "ExampleContextValue");
+        final Map<String, String> encryptionContext = Collections.singletonMap("ExampleContextKey", "ExampleContextValue");
         try {
-             unencrypted = Files.readAllBytes(file.toPath());
-             encryptResult = awsCrypto.encryptData(keyProvider, unencrypted , encryptionContext);
+            unencrypted = Files.readAllBytes(file.toPath());
+            encryptResult = awsCrypto.encryptData(keyProvider, unencrypted , encryptionContext);
 
         } catch (Exception e) {
             e.printStackTrace();
